@@ -1,0 +1,26 @@
+What changed
+consumers.py
+
+connect():
+It reads ?user_id= from the URL and closes the socket if it's not a valid UUID. This part is temporary until JWT.
+It loads the user's conversations. prefetch_related("participants") gets all the participants in one extra query instead of one per chat.
+It joins chat_<id> for each chat, plus user_<id>, then sends chat_list.
+self.conversations remembers which chats this socket belongs to. That's how handle_send_message refuses a chat_id the user isn't part of. Never trust a chat_id sent by the browser.
+receive() routes on the type field through the handlers dict, which is the idea from your earlier comment. Adding a new action means adding one line to that dict.
+In group_send, "type": "chat.message" is how Channels knows which method to call: the dot becomes an underscore, so chat_message() runs on every consumer in the group, including the sender's. That's why A receives their own message, which serves as confirmation that it was delivered.
+Lobby messages skip the database. Friend messages are saved, which is why they have an id.
+Other files
+
+routing.py: the route is now ws/chat/, with no ID in the URL.
+index.html: a new test page with the chat list on the left, the messages, and a raw JSON panel showing exactly what the server sends. I deleted room.html and its view.
+create_friend_chat.py: a test command that creates a friend chat between two UUIDs.
+Try it in the browser
+
+docker run -d --rm --name chat-redis -p 6380:6379 redis:7
+python manage.py create_friend_chat 11111111-1111-1111-1111-111111111111 22222222-2222-2222-2222-222222222222
+python manage.py runserver
+Then open two tabs:
+
+http://localhost:8000/chat/?user_id=11111111-1111-1111-1111-111111111111
+http://localhost:8000/chat/?user_id=22222222-2222-2222-2222-222222222222
+Click the chat in each tab and send messages back and forth.

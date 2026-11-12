@@ -1,27 +1,91 @@
-<!-- chat/templates/chat/index.html -->
+<!-- chat/templates/chat/index.html  (DEV ONLY test page) -->
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8"/>
-    <title>Chat Rooms</title>
+    <title>Chat test</title>
+    <style>
+        body { font-family: sans-serif; display: grid; grid-template-columns: 260px 1fr; gap: 16px; margin: 16px; }
+        #chats button { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
+        #chats button.active { background: #cde; }
+        #log, #raw { width: 100%; height: 220px; font-family: monospace; }
+    </style>
 </head>
 <body>
-    What chat room would you like to enter?<br>
-    <input id="room-name-input" type="text" size="100"><br>
-    <input id="room-name-submit" type="button" value="Enter">
+    <div>
+        <p>You are: <code id="me"></code></p>
+        <h3>Your chats</h3>
+        <div id="chats"></div>
+    </div>
+    <div>
+        <h3>Messages in <code id="current">(pick a chat)</code></h3>
+        <textarea id="log" readonly></textarea><br>
+        <input id="input" type="text" size="80">
+        <button id="send">Send</button>
+        <h3>Raw JSON received</h3>
+        <textarea id="raw" readonly></textarea>
+    </div>
 
     <script>
-        document.querySelector('#room-name-input').focus();
-        document.querySelector('#room-name-input').onkeyup = function(e) {
-            if (e.key === 'Enter') {  // enter, return
-                document.querySelector('#room-name-submit').click();
+        // DEV ONLY: open /chat/?user_id=<uuid>
+        // const userId = new URLSearchParams(window.location.search).get("user_id");
+        // document.getElementById("me").textContent = userId || "(missing ?user_id=)";
+
+        const socket = new WebSocket(`ws://${window.location.host}/ws/chat/`);
+        const messages = {};   // chat_id -> list of messages
+        let current = null;    // selected chat_id
+
+        socket.onmessage = (e) => {
+            document.getElementById("raw").value += e.data + "\n";
+            const data = JSON.parse(e.data);
+            const userId = data.user_id
+
+            switch (data.type) {
+                case "chat_list":
+                    data.chats.forEach(addChat);
+                    break;
+                case "chat_created":
+                    addChat(data.chat);
+                    break;
+                case "chat_message":
+                    (messages[data.message.chat_id] ??= []).push(data.message);
+                    if (data.message.chat_id === current) render();
+                    break;
+                case "error":
+                    alert(data.error);
+                    break;
             }
         };
+        socket.onclose = () => console.error("Chat socket closed");
 
-        document.querySelector('#room-name-submit').onclick = function(e) {
-            var roomName = document.querySelector('#room-name-input').value;
-            window.location.pathname = '/chat/' + roomName + '/';
+        function addChat(chat) {
+            const btn = document.createElement("button");
+            btn.textContent = chat.type === "friend"
+                ? `friend: ${chat.friend_id}`
+                : `lobby: ${chat.lobby_id}`;
+            btn.onclick = () => {
+                current = chat.id;
+                document.querySelectorAll("#chats button").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                document.getElementById("current").textContent = chat.id;
+                render();
+            };
+            document.getElementById("chats").appendChild(btn);
+        }
+
+        function render() {
+            document.getElementById("log").value = (messages[current] || [])
+                .map(m => `${m.sender_id === userId ? "me" : m.sender_id}: ${m.content}`)
+                .join("\n");
+        }
+
+        const input = document.getElementById("input");
+        document.getElementById("send").onclick = () => {
+            if (!current || !input.value) return;
+            socket.send(JSON.stringify({ type: "send_message", chat_id: current, content: input.value }));
+            input.value = "";
         };
+        input.onkeyup = (e) => { if (e.key === "Enter") document.getElementById("send").click(); };
     </script>
 </body>
 </html>

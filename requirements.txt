@@ -27,3 +27,7 @@ typing_extensions==4.16.0
 ujson==6.0.0
 zope.interface==8.6
 nats-py>=2.7.0
+djangorestframework-simplejwt[crypto]>=5.3.0
+
+# docker run -d --rm --name chat-redis -p 6380:6379 redis:7
+# docker run -d --rm --name chat-nats -p 4222:4222 -p 8222:8222 nats -js -m 8222
