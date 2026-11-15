@@ -10,22 +10,29 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+# Everything that differs between your laptop and Docker comes from environment
+# variables. Defaults are for local development only.
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-b_52y(w%e$z^uv+obw)87vztkt5eufz(9d@y6bx&3y^7g4q!1o"
+# off unless explicitly turned on: forgetting the variable in production is safe
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off")
+    SECRET_KEY = "django-insecure-dev-only"
 
-ALLOWED_HOSTS = []
+# comma-separated, e.g. "chat,localhost"
+ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 
 
 # Application definition
@@ -35,7 +42,6 @@ INSTALLED_APPS = [
     "chat",
     "django.contrib.admin",
     "django.contrib.auth",
-    "rest_framework",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
@@ -75,10 +81,15 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
+# same variable names as the official postgres image: one env file feeds both containers
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("POSTGRES_DB", "chat"),
+        "USER": os.environ.get("POSTGRES_USER", "chat"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "chat"),
+        "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }
 }
 
@@ -129,27 +140,19 @@ MAILERS = {
     },
 }
 
-REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 10,
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
-}
-
 ASGI_APPLICATION = "config.asgi.application"
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6380)],
+            "hosts": [os.environ.get("REDIS_URL", "redis://127.0.0.1:6380")],
         },
     },
 }
 
-NATS_URL = "nats://127.0.0.1:4222"
+NATS_URL = os.environ.get("NATS_URL", "nats://127.0.0.1:4222")
 
 JWT_COOKIE_NAME = 'access_token'
 
-JWT_URL = "https://authentication"
+JWT_URL = os.environ.get("JWT_URL", "https://authentication")

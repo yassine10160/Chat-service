@@ -1,7 +1,7 @@
 
 import jwt
 from jwt import PyJWKClient
-from ..config import settings
+from django.conf import settings
 
 jwks_client = PyJWKClient(settings.JWT_URL)
 
@@ -16,6 +16,6 @@ def verify_token(token):
         issuer="terranaut",
         algorithms=["RS256"],
         )
-    except jwt.ExpiredSignatureError, as e:
-        print(e) #tmp
+    except jwt.ExpiredSignatureError as e:
+        print(e) #temporaryyyyy !!!!!
     return payload['sub']
