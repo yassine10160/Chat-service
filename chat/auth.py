@@ -1,4 +1,4 @@
-
+import uuid
 import jwt
 from jwt import PyJWKClient
 from django.conf import settings
@@ -18,4 +18,4 @@ def verify_token(token):
         )
     except jwt.ExpiredSignatureError as e:
         print(e) #temporaryyyyy !!!!!
-    return payload['sub']
+    return uuid.UUID(payload['sub'])
